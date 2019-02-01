@@ -44,8 +44,8 @@ FusionEKF::FusionEKF( ) {
   MatrixXd P(4,4);
   P << 1, 0,      0,    0,
        0, 1,      0,    0,
-       0, 0,     10,    0,
-       0, 0,      0,   10;
+       0, 0,   1000,    0,
+       0, 0,      0,  1000;
 
   MatrixXd F = MatrixXd::Identity(4,4);
 
@@ -72,13 +72,13 @@ void FusionEKF::Initialize( const MeasurementPackage &meas_pack ) {
     
     // ekf_.x_ << 1, 1, 1, 1;  // Mateo: Commented out
     VectorXd rm = meas_pack.raw_measurements_;
+    previous_timestamp_ = meas_pack.timestamp_;
 
     if (meas_pack.sensor_type_ == MeasurementPackage::RADAR) {            
       float rho     = rm(0),
             phi     = rm(1), 
             rho_dot = rm(2);
-
-      // TODO: check
+      
       float px = rho * cos(phi), 
             py = rho * sin(phi), 
             vx = rho_dot * cos(phi),
@@ -110,6 +110,8 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &meas_pack) {
    * Prediction
    */
   float dt = (meas_pack.timestamp_ - previous_timestamp_) / 1000000.0;
+  //cout << "dt = " << dt;
+
   previous_timestamp_ = meas_pack.timestamp_; 
   /**
    * Update the state transition matrix F according to the new elapsed time.

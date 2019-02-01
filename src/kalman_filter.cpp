@@ -52,18 +52,30 @@ void KalmanFilter::Update(const VectorXd &z) {
   P_ = (I - K * H_) * P_;
 }
 
+#include <iostream>
+#include <cmath>
+using std::cout; // using std::{ cout, endl }
+using std::endl; 
+
 void KalmanFilter::UpdateEKF(const VectorXd &z) {
   // z_pred = h(x)  where h is non-linear
   VectorXd z_pred = VectorXd(3);  
   
   double rho = sqrt( x_(0) * x_(0) + x_(1) * x_(1) );
   double phi = atan2( x_(1), x_(0) );
-  assert ( -2 * M_PI <= phi &&  phi <= 2 * M_PI ); 
+  /* if( phi < 0 ) {
+    phi += 2 * M_PI;
+  } */
+  // cout << " phi=" << phi << endl ; 
+  assert ( - M_PI <= phi &&  phi <=  M_PI ); 
+  // assert ( 0.0 <= phi &&  phi <= 2 * M_PI ); 
   double rho_dot = ( x_(0) * x_(2) + x_(1) * x_(3) ) / rho; 
   
   z_pred << rho, phi, rho_dot;
 
-  VectorXd y = z - z_pred;   
+  VectorXd y = z - z_pred;
+  y(1) = fmod( y(1) , 2 * M_PI);
+
   MatrixXd Ht = H_.transpose();
   MatrixXd S = H_ * P_ * Ht + R_;    
   MatrixXd K = P_ * Ht * S.inverse();

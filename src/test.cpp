@@ -12,7 +12,7 @@ using Eigen::MatrixXd;
 
 
 vector<string> str_split( string a_str, char sep );
-string vector_to_str( VectorXd v );
+string vector_to_str( VectorXd v, int precision );
 
 class TestState {
 
@@ -47,9 +47,10 @@ int main() {
         assert( st.estimations_.size() == st.ground_truths_.size() );
         VectorXd diffs = st.estimations_[n] - st.ground_truths_[n];
         
-        cout << count << ":  diffs: " <<  vector_to_str(diffs)
+        cout << count << ":  diffs: " <<  vector_to_str(diffs, 3)             
              << "  diffs_norm: " << diffs.norm()
-             << "    RMSE: " << vector_to_str(RMSE) << endl;
+             << "  x,y: " << st.fusionEKF_.ekf_.x_(0)<< ", " << st.fusionEKF_.ekf_.x_(1)
+             << "    RMSE: " << vector_to_str(RMSE, 3) << endl;
         count ++;
     }
 
@@ -85,7 +86,7 @@ void TestState::proc_line( string line  ) {
         meas_package.raw_measurements_ = VectorXd(3);
         float rho = stod( ps[1] ), 
               phi = stod( ps[2] ),
-              rho_dot = stod( ps[3 ]);
+              rho_dot = stod( ps[3] );
         
         meas_package.raw_measurements_ << rho, phi, rho_dot;
         meas_package.timestamp_ = stol( ps[4] ); 
@@ -107,8 +108,10 @@ void TestState::proc_line( string line  ) {
     estimations_.push_back(estimate);
 }
 
-string vector_to_str( VectorXd v ) {
+string vector_to_str( VectorXd v, int precision = 3 ) {
     std::stringstream ss;
+
+    ss.precision( precision );
     ss << "[";
     int n = v.size();
     for ( auto i = 0; i< n; i++ ) {
