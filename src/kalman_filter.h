@@ -27,6 +27,15 @@ class KalmanFilter {
   void Init(Eigen::VectorXd &x_in, Eigen::MatrixXd &P_in, Eigen::MatrixXd &F_in,
             Eigen::MatrixXd &H_in, Eigen::MatrixXd &R_in, Eigen::MatrixXd &Q_in);
 
+
+/**
+   * InitPF Initializes Just P and F matrices   *
+   * @param P_in Initial state covariance
+   * @param F_in Transition matrix   
+   */
+  void InitPF(Eigen::MatrixXd &P_in, Eigen::MatrixXd &F_in);
+
+
   /**
    * Prediction Predicts the state and the state covariance
    * using the process model
@@ -63,6 +72,7 @@ class KalmanFilter {
 
   // measurement covariance matrix
   Eigen::MatrixXd R_;
+
 };
 
 #endif // KALMAN_FILTER_H_

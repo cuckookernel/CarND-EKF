@@ -70,8 +70,7 @@ int main() {
           if (sensor_type.compare("L") == 0) {
             meas_package.sensor_type_ = MeasurementPackage::LASER;
             meas_package.raw_measurements_ = VectorXd(2);
-            float px;
-            float py;
+            float px, py;            
             iss >> px;
             iss >> py;
             meas_package.raw_measurements_ << px, py;
@@ -80,13 +79,11 @@ int main() {
           } else if (sensor_type.compare("R") == 0) {
             meas_package.sensor_type_ = MeasurementPackage::RADAR;
             meas_package.raw_measurements_ = VectorXd(3);
-            float ro;
-            float theta;
-            float ro_dot;
+            float ro, theta, ro_dot;            
             iss >> ro;
             iss >> theta;
             iss >> ro_dot;
-            meas_package.raw_measurements_ << ro,theta, ro_dot;
+            meas_package.raw_measurements_ << ro, theta, ro_dot;
             iss >> timestamp;
             meas_package.timestamp_ = timestamp;
           }
@@ -117,17 +114,20 @@ int main() {
 
           double p_x = fusionEKF.ekf_.x_(0);
           double p_y = fusionEKF.ekf_.x_(1);
-          double v1  = fusionEKF.ekf_.x_(2);
-          double v2 = fusionEKF.ekf_.x_(3);
+          double v_x = fusionEKF.ekf_.x_(2);
+          double v_y = fusionEKF.ekf_.x_(3);
 
           estimate(0) = p_x;
           estimate(1) = p_y;
-          estimate(2) = v1;
-          estimate(3) = v2;
+          estimate(2) = v_x;
+          estimate(3) = v_y;
         
           estimations.push_back(estimate);
 
           VectorXd RMSE = tools.CalculateRMSE(estimations, ground_truth);
+
+          // TODO: take out 
+          // cout << RMSE << endl; 
 
           json msgJson;
           msgJson["estimate_x"] = p_x;

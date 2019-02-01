@@ -14,7 +14,7 @@ class FusionEKF {
   /**
    * Constructor.
    */
-  FusionEKF();
+  FusionEKF( );
 
   /**
    * Destructor.
@@ -22,14 +22,20 @@ class FusionEKF {
   virtual ~FusionEKF();
 
   /**
+   * Applied for the first measurement only 
+   **/ 
+  void Initialize( const MeasurementPackage & );
+
+  /**
    * Run the whole flow of the Kalman Filter from here.
    */
   void ProcessMeasurement(const MeasurementPackage &measurement_pack);
-
+ 
   /**
    * Kalman Filter update and prediction math lives in here.
    */
-  KalmanFilter ekf_;
+  KalmanFilter ekf_;  
+  bool verbose_ = true; 
 
  private:
   // check whether the tracking toolbox was initialized or not (first measurement)
@@ -44,6 +50,11 @@ class FusionEKF {
   Eigen::MatrixXd R_radar_;
   Eigen::MatrixXd H_laser_;
   Eigen::MatrixXd Hj_;
+
+  float noise_ax;
+  float noise_ay;
+  
+  
 };
 
 #endif // FusionEKF_H_
