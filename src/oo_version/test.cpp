@@ -2,6 +2,7 @@
 #include <iostream>
 #include "FusionEKF.h"
 #include "tools.h"
+#include <chrono>
 
 using std::vector;
 using std::string;
@@ -28,10 +29,12 @@ class TestState {
 int main() {
 
     string input_fn = "../data/obj_pose-laser-radar-synthetic-input.txt";
+    bool calc_rmse = false,
+         verbose = false;
 
     // used to compute the RMSE later
     TestState st;
-    st.fusionEKF_.verbose_= false; 
+    st.fusionEKF_.verbose_= false;
 
     Tools tools;     
 
@@ -39,21 +42,37 @@ int main() {
     string line;
     long count = 0;
     cout<< "After opening... good: " << ifs.good() << " is_open: " << ifs.is_open() << endl;
+    auto t0 = std::chrono::system_clock::now();
+
     while( getline(ifs, line) ) {
+        // cout << "\n\n OO " << count << " : " << endl;
 
         st.proc_line( line );
-        VectorXd RMSE = tools.CalculateRMSE( st.estimations_, st.ground_truths_);
-        auto n = st.estimations_.size() - 1;
-        assert( st.estimations_.size() == st.ground_truths_.size() );
-        VectorXd diffs = st.estimations_[n] - st.ground_truths_[n];
+        VectorXd RMSE(4);
+        RMSE.setZero();
+
+        if( calc_rmse ) {
+            RMSE =  tools.CalculateRMSE( st.estimations_, st.ground_truths_) ;
+        };
         
-        cout << count << ":  diffs: " <<  vector_to_str(diffs, 3)             
-             << "  diffs_norm: " << diffs.norm()
-             << "  x,y: " << st.fusionEKF_.ekf_.x_(0)<< ", " << st.fusionEKF_.ekf_.x_(1)
-             << "    RMSE: " << vector_to_str(RMSE, 3) << endl;
+        if(verbose) {
+            auto n = st.estimations_.size() - 1;
+            assert( st.estimations_.size() == st.ground_truths_.size() );
+            VectorXd diffs = st.estimations_[n] - st.ground_truths_[n];
+
+            cout << count << ":  diffs: " <<  vector_to_str(diffs, 3)             
+                 << "  diffs_norm: " << diffs.norm()
+                << "  x,y: " << st.fusionEKF_.ekf_.x_(0)<< ", " << st.fusionEKF_.ekf_.x_(1)
+                << "  RMSE: " << vector_to_str(RMSE, 3) << endl;
+        }
         count ++;
+
     }
 
+    auto t1 = std::chrono::system_clock::now();
+    auto elapsed = (t1 - t0).count();
+    cout << "elapsed: " << elapsed << endl;
+    
     ifs.close();
     return 0;
 }

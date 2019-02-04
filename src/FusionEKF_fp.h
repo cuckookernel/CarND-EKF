@@ -5,40 +5,45 @@
 #include <string>
 #include <vector>
 #include "Eigen/Dense"
-#include "kalman_filter.h"
 #include "measurement_package.h"
-#include "tools.h"
+#include "tools_fp.h"
 #include <limits>
 #include <memory> 
 
 namespace ekf {  
 
     typedef long long tstamp_t;
+    typedef Eigen::Matrix<double,4,1> State_x;
+    typedef Eigen::Matrix<double,4,4> Pmat;
+    typedef Eigen::Matrix<double,2,4> Hlaser_t;
+    typedef Eigen::Matrix<double,2,2> Rlaser_t;
+    typedef Eigen::Matrix<double,3,3> Rradar_t;
 
 
     struct State {
         /* Immutable record, all members const and public */ 
 
         public: 
-            const Eigen::Matrix<double,4,1> x_;
-            const Eigen::Matrix<double,4,4> P_;
-            const long long timestamp_ = std::numeric_limits<long long>::min();
+            const State_x x_;
+            const Pmat P_;
+            const tstamp_t timestamp_ = std::numeric_limits<long long>::min();
 
             State() {}; 
 
             State( const Eigen::VectorXd& x_ini, const Eigen::MatrixXd& P_ini, tstamp_t ts_ini )
             : x_(x_ini), P_(P_ini), timestamp_(ts_ini) {};
 
-            State( const State& rhs) 
+            State( const State& rhs ) 
             : x_(rhs.x_), P_(rhs.P_), timestamp_(rhs.timestamp_) {};
-         
+
+            void operator=( const State& rhs ) {
+                const_cast<State_x&>(x_)  = rhs.x_;
+                const_cast<Pmat&>( P_ )  = rhs.P_;
+                const_cast<tstamp_t&>( timestamp_ ) = rhs.timestamp_;
+            }         
             
     };
-
-    typedef std::unique_ptr<State> StatePtr;
-    typedef Eigen::Matrix<double,2,4> Hlaser_t;
-    typedef Eigen::Matrix<double,2,2> Rlaser_t;
-    typedef Eigen::Matrix<double,3,3> Rradar_t;
+        
     
     struct Params {
         public : 
@@ -58,7 +63,7 @@ namespace ekf {
 
     const Params setup_params( );
 
-    StatePtr initial_state( const MeasurementPackage& mp );
+    State initial_state( const MeasurementPackage& mp );
 
     /**
     * Prediction Predicts the state and the state covariance
@@ -66,16 +71,18 @@ namespace ekf {
     * @param delta_T Time between k and k+1 in s
     */
 
-    StatePtr predict( const StatePtr& state, const MatrixXd& F, const MatrixXd& Q, tstamp_t new_ts );
+    State predict( const State& state, const Eigen::MatrixXd& F, const Eigen::MatrixXd& Q, tstamp_t new_ts );
 
-    StatePtr proc_measurement( const StatePtr& state,
+    State proc_measurement( const State& state,
                                const MeasurementPackage &measurement_pack, const Params& params);
 
     /* implement linear KF update */ 
-    StatePtr update_laser( const StatePtr& state, const VectorXd &z, const Hlaser_t& H, const Rlaser_t& R );
+    State update_laser( const State& state, const Eigen::VectorXd &z, const Hlaser_t& H, const Rlaser_t& R );
 
     /* implement extended KF update */ 
-    StatePtr update_radar( const StatePtr& state, const VectorXd &z, const Rradar_t& R );
+    State update_radar( const State& state, const Eigen::VectorXd &z, const Rradar_t& R );
+
+    void maybe_log( const Params& params, const State& state );
         
 }
 

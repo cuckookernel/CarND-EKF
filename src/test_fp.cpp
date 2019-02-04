@@ -2,6 +2,7 @@
 #include <iostream>
 #include "FusionEKF_fp.h"
 #include "tools_fp.h"
+#include <chrono>
 
 using std::vector;
 using std::string;
@@ -9,7 +10,6 @@ using std::cout;
 using std::endl; 
 using Eigen::VectorXd;
 using Eigen::MatrixXd;
-using ekf::StatePtr;
 using ekf::State;
 using ekf::Params;
 
@@ -22,7 +22,7 @@ class TestState {
     public:
         void proc_line( string line  );
 
-        StatePtr state_;        
+        State state_;        
         bool initialized_ = false; 
 
         vector<VectorXd> estimations_;
@@ -38,31 +38,48 @@ int main() {
     string input_fn = "../data/obj_pose-laser-radar-synthetic-input.txt";
 
     TestState st;
-    
     st.params_.verbose = false; 
+    bool compute_rmse = false; 
 
     // used to compute the RMSE later
-    TestState st;
-    st.state_ = StatePtr( new State( ) );
         
     std::ifstream ifs( input_fn );
     string line;
+
+    auto t0 = std::chrono::system_clock::now();
+
     long count = 0;
     cout<< "After opening... good: " << ifs.good() << " is_open: " << ifs.is_open() << endl;
-    while( getline(ifs, line) ) {
+    VectorXd RMSE;
+    RMSE.setZero(); 
 
-        st.proc_line( line );
-        VectorXd RMSE = tools::CalculateRMSE( st.estimations_, st.ground_truths_);
-        auto n = st.estimations_.size() - 1;
-        assert( st.estimations_.size() == st.ground_truths_.size() );
-        VectorXd diffs = st.estimations_[n] - st.ground_truths_[n];
+    while( getline(ifs, line) ) {
+        // cout << "\n\n FP " << count << " : " << endl;
+        st.proc_line( line );        
+        if( compute_rmse ) {
+            RMSE    = tools::CalculateRMSE( st.estimations_, st.ground_truths_);   
+        }
         
-        cout << count << ":  diffs: " <<  vector_to_str(diffs, 3)             
-             << "  diffs_norm: " << diffs.norm()
-             << "  x,y: " << st.state_->x_(0)<< ", " << st.state_->x_(1)
-             << "    RMSE: " << vector_to_str(RMSE, 3) << endl;
+        if (st.params_.verbose ) {
+            auto n = st.estimations_.size() - 1;
+            assert( st.estimations_.size() == st.ground_truths_.size() );
+            VectorXd diffs = st.estimations_[n] - st.ground_truths_[n];
+        
+            cout << count << " :  diffs: " <<  vector_to_str(diffs, 3)             
+                << "  diffs_norm: " << diffs.norm()
+                << "  x,y: " << st.state_.x_(0)<< ", " << st.state_.x_(1)
+                << "    RMSE: " << vector_to_str(RMSE, 3) << endl;            
+        }
+
         count ++;
+        /* if( count > 3 ) {
+            break;
+        }*/
     }
+
+    auto t1 = std::chrono::system_clock::now();
+    auto elapsed = (t1 - t0).count();
+    cout << "elapsed: " << elapsed << endl;
 
     ifs.close();
     return 0;
@@ -114,12 +131,12 @@ void TestState::proc_line( string line  ) {
         state_ = ekf::initial_state( meas_package ); 
         initialized_ = true; 
     } else {
-        state_  = ekf::proc_measurement(state_, meas_package, params_);       
+        state_ = ekf::proc_measurement(state_, meas_package, params_);       
     }
 
     // Push the current estimated x,y positon from the Kalman filter's 
     //   state vector    
-    estimations_.push_back( state_->x_ );
+    estimations_.push_back( state_.x_ );
 }
 
 string vector_to_str( VectorXd v, int precision = 3 ) {

@@ -44,7 +44,7 @@ const Params setup_params( ) {
 
 }
 
-StatePtr ekf::initial_state( const MeasurementPackage &meas_pack ) {
+State initial_state( const MeasurementPackage &meas_pack ) {
 
     // TODO take P from client
     MatrixXd P(4,4);
@@ -58,7 +58,8 @@ StatePtr ekf::initial_state( const MeasurementPackage &meas_pack ) {
     
     // ekf_.x_ << 1, 1, 1, 1;  // Mateo: Commented out
     VectorXd rm = meas_pack.raw_measurements_;
-    
+    VectorXd x(4);
+
     if (meas_pack.sensor_type_ == MeasurementPackage::RADAR) {            
       double rho     = rm(0),
              phi     = rm(1), 
@@ -69,37 +70,39 @@ StatePtr ekf::initial_state( const MeasurementPackage &meas_pack ) {
              vx = rho_dot * cos(phi),
              vy = rho_dot * sin(phi);
 
-      VectorXd x(4);
       x << px, py, vx, vy;
-      return StatePtr( new State(x, P, meas_pack.timestamp_) ); 
+      return State(x, P, meas_pack.timestamp_); 
     }
     else if (meas_pack.sensor_type_ == MeasurementPackage::LASER) {            
       float px = rm(0), py = rm(1);
-      VectorXd x(4);
       x << px, py, 0, 0; 
-
-      return StatePtr( new State(x, P, meas_pack.timestamp_) ); 
+      
     }
- 
+
+    //cout << "initial_state:\nx=" << x << endl <<" P = " <<  P << endl; 
+    return State(x, P, meas_pack.timestamp_);      
 } 
 
-StatePtr predict( const StatePtr& state, const MatrixXd& F, const MatrixXd& Q ) {
+State predict( const State& state, const MatrixXd& F, const MatrixXd& Q, tstamp_t new_ts ) {
   // taken verbatim from 23.14 Laser Measurements part 4
   MatrixXd Ft = F.transpose();
-  auto new_x = F * state->x_;
-  auto new_P = F * state->P_ * Ft + Q;
+  MatrixXd new_x = (F * state.x_);
+  MatrixXd new_P = F * state.P_ * Ft + Q;
+  
+  return State(new_x, new_P, new_ts);
 
-  return StatePtr( new State(new_x, new_P, state->timestamp_) ) ;
+  // cout << "predict:\n" << ret->x_ << endl << ret->P_ << endl; 
+  //return ret;
    
 }
 
 
-StatePtr proc_measurement(const StatePtr& state0, const MeasurementPackage &meas_pack, const Params& params) {
+State proc_measurement(const State& state0, const MeasurementPackage &meas_pack, const Params& params) {
   /**
    * Prediction
    */
   long long new_ts = meas_pack.timestamp_;
-  float dt = ( new_ts - state0->timestamp_) / 1000000.0;
+  float dt = ( new_ts - state0.timestamp_) / 1000000.0;
   //cout << "dt = " << dt;  
   /**
    * Update the state transition matrix F according to the new elapsed time.
@@ -114,18 +117,18 @@ StatePtr proc_measurement(const StatePtr& state0, const MeasurementPackage &meas
    * Use noise_ax = 9 and noise_ay = 9 for your Q matrix.
    */ 
   float dt_2 = dt * dt;
-  float dt_3 = dt_2 * dt;
-  float dt_4 = dt_3 * dt;
+  float dt_3 = dt_2 * dt / 2;
+  float dt_4 = dt_3 * dt / 4;
   
   double n_ax = params.noise_ax, 
          n_ay = params.noise_ay; 
   Matrix<double, 4, 4 > Q;
-  Q <<  dt_4 / 4 * n_ax, 0, dt_3/2 * n_ax, 0,
-        0, dt_4 / 4 * n_ay, 0, dt_3/2 * n_ay,
-        dt_3 / 2 * n_ax, 0, dt_2 * n_ax  , 0,
-        0, dt_3 / 2 * n_ay, 0,   dt_2 * n_ay;
+  Q <<  dt_4 * n_ax, 0 , dt_3 * n_ax, 0,
+        0, dt_4  * n_ay, 0, dt_3 * n_ay,
+        dt_3  * n_ax, 0, dt_2 * n_ax  , 0,
+        0, dt_3  * n_ay, 0,   dt_2 * n_ay;
 
-  auto state1 = predict( state0, F, Q );
+  auto state1 = predict( state0, F, Q, meas_pack.timestamp_ );
   /**
    * Update
    * - Update the state and covariance matrices.
@@ -145,43 +148,54 @@ StatePtr proc_measurement(const StatePtr& state0, const MeasurementPackage &meas
   
 }
 
-void maybe_log( const Params& params, const StatePtr& state ) {
+void maybe_log( const Params& params, const State& state ) {
   // print the output
     if( params.verbose ) {
-      cout << "x_ = " << state->x_ << endl;
-      cout << "P_ = " << state->P_ << endl;
+      cout << "x_ = " << state.x_ << endl;
+      cout << "P_ = " << state.P_ << endl;
     }
 }
 
-StatePtr update_laser(const StatePtr& state, const VectorXd &z, 
-                      const Hlaser_t& H, const Rlaser_t& R, tstamp_t new_ts) {
+State update_laser(const State& state, const VectorXd &z, 
+                      const Hlaser_t& H, const Rlaser_t& R ) {
                         
   // taken verbatim from 23.14 Laser Measurements part 4 
-  const VectorXd& x1 = state->x_; 
+  const VectorXd& x1 = state.x_; 
 
   VectorXd z_pred = H * x1;
   VectorXd y = z - z_pred;
   MatrixXd Ht = H.transpose();
-  MatrixXd S = H * state->P_ * Ht + R;  
-  MatrixXd K = state->P_ * Ht * S.inverse();
+  MatrixXd S = H * state.P_ * Ht + R;  
+  MatrixXd K = state.P_ * Ht * S.inverse();
 
-  //new estimate  
-  // long x_size = x1.size();
+  //new estimate    
   Matrix<double, 4, 4> I;
   I.setIdentity(); //  = MatrixXd::Identity(x_size, x_size);
 
-  auto new_x = x1 + (K * y);
-  auto new_P = (I - K * H) * state->P_;
-  return StatePtr( new State( new_x, new_P, new_ts ) ); 
-                
+  VectorXd new_x = x1 + (K * y);
+  MatrixXd new_P = (I - K * H) * state.P_;
+
+  /*
+  cout << "update_rlaser: " << endl
+       <<  "z_pred= " << z_pred.transpose() << endl
+       <<  "y = " << z_pred.transpose() << endl
+       <<  "H = " << H << endl       
+       << "S =" << S << endl
+       << "K =" << K << endl
+       << "new_x=" << new_x << endl
+       << "new_p =" << new_P << endl 
+       ;
+       */
+
+  return State( new_x, new_P, state.timestamp_ );                 
 }
 
-StatePtr update_radar(const StatePtr& state, const VectorXd &z, const Rradar_t& R, tstamp_t new_ts ) {
+State update_radar(const State& state, const VectorXd &z, const Rradar_t& R  ) {
   // z_pred = h(x)  where h is non-linear
-  const VectorXd & x1 = state->x_;
-  const Matrix<double,4,4> P = state->P_;
+  const VectorXd & x1 = state.x_;
+  Pmat P = state.P_;
 
-  MatrixXd H = tools::CalculateJacobian( x1 );
+  MatrixXd Hj = tools::CalculateJacobian( x1 );
   
   double rho = sqrt( x1(0) * x1(0) + x1(1) * x1(1) );
   double phi = atan2( x1(1), x1(0) );
@@ -197,17 +211,31 @@ StatePtr update_radar(const StatePtr& state, const VectorXd &z, const Rradar_t& 
   VectorXd y = z - z_pred;
   y(1) = fmod( y(1) , 2 * M_PI);
 
-  MatrixXd Ht = H.transpose();
-  MatrixXd S = H * P * Ht + R;    
+  MatrixXd Ht = Hj.transpose();
+  MatrixXd S = Hj * P * Ht + R;    
   MatrixXd K = P * Ht * S.inverse();
 
-  Matrix<double, 4, 4> I;
+  Pmat I;
   I.setIdentity(); //  = MatrixXd::Identity(x_size, x_size);
 
-  auto new_x =  x1 + (K * y);
-  auto new_P = (I - K * H) * state->P_;
-  
-  return StatePtr( new State( new_x, new_P, new_ts ) );   
+  VectorXd new_x =  x1 + (K * y);
+  MatrixXd new_P = (I - K * Hj) * P;
+
+  /*
+  cout << "update_radar: " << endl
+       <<  "x1= "      << x1.transpose() << endl
+       <<  "(K * y)= " << (K * y) << endl
+       <<  "z_pred= " << z_pred.transpose() << endl
+       <<  "y = " << z_pred.transpose() << endl
+       <<  "Hj = " << Hj << endl       
+       << "S =" << S << endl
+       << "K =" << K << endl
+       << "new_x=" << new_x << endl
+       << "new_p =" << new_P << endl 
+       ;
+  */
+
+  return State(  new_x, new_P, state.timestamp_ ) ;   
 }
 
 }  

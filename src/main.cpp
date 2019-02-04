@@ -41,7 +41,7 @@ int main() {
   const Params& params = ekf::setup_params();
   bool initialized = false;
 
-  ekf::StatePtr state;
+  ekf::State state;
 
   h.onMessage([&params, &initialized, &state, &estimations, &ground_truth]
               (uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, 
@@ -106,10 +106,10 @@ int main() {
           // Push the current estimated x,y positon from the Kalman filter's 
           //   state vector
           
-          double p_x = state->x_(0),
-                 p_y = state->x_(1),
-                 v_x = state->x_(2),
-                 v_y = state->x_(3);
+          double p_x = state.x_(0),
+                 p_y = state.x_(1),
+                 v_x = state.x_(2),
+                 v_y = state.x_(3);
 
           VectorXd estimate(4);
           estimate << p_x, p_y, v_x, v_y;

@@ -2,8 +2,12 @@
 #include "assert.h"
 #include "math.h"
 
+#include <iostream>
+
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
+using std::cout;
+using std::endl;
 
 /* 
  * Please note that the Eigen library does not initialize 
@@ -35,6 +39,9 @@ void KalmanFilter::Predict() {
   x_ = F_ * x_;
   MatrixXd Ft = F_.transpose();
   P_ = F_ * P_ * Ft + Q_;
+
+  // cout << "Predict:\n" << x_ << endl << "P_" << P_ << endl; 
+
 }
 
 void KalmanFilter::Update(const VectorXd &z) {
@@ -50,6 +57,17 @@ void KalmanFilter::Update(const VectorXd &z) {
   long x_size = x_.size();
   MatrixXd I = MatrixXd::Identity(x_size, x_size);
   P_ = (I - K * H_) * P_;
+
+  /*
+  cout << "Update Linear: " << endl
+       <<  "z_pred= " << z_pred.transpose() << endl
+       <<  "y = " << z_pred.transpose() << endl
+       <<  "H = " << H_ << endl       
+       << "S =" << S << endl
+       << "K =" << K << endl
+       << "x_=" << x_ << endl
+       << "P_ =" << P_ << endl 
+       ; */
 }
 
 #include <iostream>
@@ -63,9 +81,7 @@ void KalmanFilter::UpdateEKF(const VectorXd &z) {
   
   double rho = sqrt( x_(0) * x_(0) + x_(1) * x_(1) );
   double phi = atan2( x_(1), x_(0) );
-  /* if( phi < 0 ) {
-    phi += 2 * M_PI;
-  } */
+
   // cout << " phi=" << phi << endl ; 
   assert ( - M_PI <= phi &&  phi <=  M_PI ); 
   // assert ( 0.0 <= phi &&  phi <= 2 * M_PI ); 
@@ -80,12 +96,21 @@ void KalmanFilter::UpdateEKF(const VectorXd &z) {
   MatrixXd S = H_ * P_ * Ht + R_;    
   MatrixXd K = P_ * Ht * S.inverse();
 
+  VectorXd x1 = x_;
   x_ = x_ + (K * y);
   long x_size = x_.size();
   MatrixXd I = MatrixXd::Identity(x_size, x_size);
   P_ = (I - K * H_) * P_;
 
-  /**
-   * TODO: update the state by using Extended Kalman Filter equations
-   */
+  /*
+  cout << "Update EKF: " << endl
+      <<  "x1= " << x1.transpose() << endl
+       <<  "z_pred= " << z_pred.transpose() << endl
+       <<  "y = " << z_pred.transpose() << endl
+       <<  "H = " << H_ << endl       
+       << "S =" << S << endl
+       << "K =" << K << endl
+       << "x_=" << x_ << endl
+       << "P_ =" << P_ << endl 
+       ;*/
 }
